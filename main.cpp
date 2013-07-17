@@ -1,10 +1,3 @@
-/*
- * main.cpp
- *
- *  Created on: Jun 27, 2013
- *      Author: kodehijau
- */
-
 #include <windows.h>
 #include <stdlib.h>
 #include <string.h>
