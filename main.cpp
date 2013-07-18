@@ -157,7 +157,7 @@ void cube()
 	}
 void rumah()
 	{
-	//menggambar kubus dan transformasi tarnslasi ke titik 0.5 0.5 0.5 dan skala 1 1 1
+	
 	//dinding
 	glPushMatrix();
 	 glColor3f(0,1,4.5);
@@ -168,9 +168,8 @@ void rumah()
 	glPopMatrix();
 	//}
 
-	
-//void ataprumah()
-//{
+
+
        
 //atap
 	glPushMatrix();
@@ -194,7 +193,6 @@ glPopMatrix();
 
 }
 
-/*
 void pagar(){
      
  //pagar depan kiri
@@ -240,9 +238,11 @@ void pagar(){
               glutSolidCube(1.2);
        glPopMatrix ();
      }
-*/
+
+
 //Hamster Exercise
 void HamsterExcercise() {
+     //kaki kiri
 	glPushMatrix();
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 	glColor3d(0.903921568627451, 0.5215686274509804, 0.2470588235294118);
@@ -252,7 +252,7 @@ void HamsterExcercise() {
 	cylinder(3.0, 3.0, 20.0);
 	glPopMatrix();
 
-	//kaki
+	//kaki kanan
 	glPushMatrix();
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 	glColor3d(0.903921568627451, 0.5215686274509804, 0.2470588235294118);
@@ -261,31 +261,118 @@ void HamsterExcercise() {
 	glRotated(-30.0, 1.0, 0.0, 0.0);
 	cylinder(3.0, 3.0, 20.0);
 	glPopMatrix();
-
+	
+   //alas
 	glPushMatrix();
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
 	glColor3d(0.0, 0.0, 0.0);
+	//glTranslated(0.0, 5.0, 0.0);
 	glutSolidCube(10);
-	glTranslated(0.0, 0.0, 10.0);
+	glTranslated(0.0, 0.0, 10.0); //0.0, -1.0, 10.0
 	glutSolidCube(10);
 	glTranslated(0.0, 0.0, -20.0);
 	glutSolidCube(10);
 	glPopMatrix();
-
+    
+    //buletan
 	glPushMatrix();
 	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.1, 1.0, 1.0);
+	glColor3d(0, 0, 205);
 	glTranslated(0.0, 40.0, 0.0);
 	glRotated(-90, 0.0, 1.0, 0.0);
-	cylinder(20.0, 20.0, 5.0);
+	cylinder(20.0, 20.0, 8.0);
 	glPopMatrix();
 }
+//pohon
+void pohon()
+{
+
+//batang
+GLUquadricObj *pObj;
+pObj =gluNewQuadric();
+gluQuadricNormals(pObj, GLU_SMOOTH);
+glPushMatrix();
+glColor3f(0.7,0.3,0);
+glRotatef(270,1,0,0);
+glScaled(2, 2, 2);
+gluCylinder(pObj, 1, 0.7, 10, 20, 15);
+glPopMatrix();
+
+ 
+//ranting
+glPushMatrix();
+glColor3ub(104,70,14);
+glScaled(2, 2, 2);
+glTranslatef(0,7,0);
+glRotatef(330,1,0,0);
+gluCylinder(pObj, 0.6, 0.1, 7, 25, 25);
+glPopMatrix();
+  
+//daun
+glPushMatrix();
+glColor3f(0,1,0.3);
+glScaled(8, 6, 10);
+glTranslatef(0,4.7,0.4);
+glutSolidDodecahedron();
+glPopMatrix();
+} 
+
 //bola
 void bola () {
         glColor3f(0.0, 1.0, 0.0); //set ball colour
         glTranslatef(0.0,0.0,1); //moving it toward the screen a bit on creation
-        glutSolidSphere (10, 7, 7); //create ball.
+        glutSolidSphere (15, 15, 15); //create ball.
 }
+
+//tempat makan
+void tempatmakan()
+{
+glPushMatrix();
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+	glColor3d(0.1, 1.0, 1.0);
+	glScaled(0.5, 0.5, 0.5);
+	glTranslated(-60.0, 10.0, -60.0);
+	glRotated(-270.0, 1.0, 0.0, 0.0);
+	cylinder(15.0, 10.0, 3.0);
+	glPopMatrix();
+}
+//tempat minum
+void tempatminum() {
+     //tabung
+     glPushMatrix();
+     glColor3f(0.0, 2.0, 1.0);
+	glRotated(-90.0, 1.0, 0.0, 0.0);
+	glTranslated(-1, -95.0, 17);
+	cylinder(6.0, 6.0, 15.0);
+    glPopMatrix();
+    
+    //sedotan
+	glPushMatrix();
+	glTranslated(0, 25, 96);
+	glRotated(180.0, 0.0, 1.0, 0.0);
+	glRotated(40.0, 1.0, 0.0, 0.0);
+	cylinder(1.0, 1.0, 15.0);
+	glPopMatrix();
+	
+    //kotak bawah
+    glPushMatrix();
+	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+	glColor3d(0.803921568627451, 0.5215686274509804, 0.2470588235294118);
+	glTranslated(0.0, 12, 95);
+	glScaled(0.5,1.5,0.5);
+	glutSolidCube(20);
+		glPopMatrix();
+}
+
+void terowongan(){
+     glPushMatrix();
+     glColor3f(0.7f,1.0f,0.7f);
+	glTranslated(-70, 0, -80);
+	glRotated(90.0, 0.0, 1.0, 0.0);
+	glRotated(40.0, 0.0, 0.0, 0.0);
+	cylinder(13.0, 13.0, 70.0);
+	glPopMatrix();
+     }
 
 void display(void) {
 	glClearStencil(0); //clear the stencil buffer
@@ -349,30 +436,64 @@ void display(void) {
 	glTranslated(50, 0, 10);
     rumah();
     glPopMatrix();
+    
+    //pagar
+     glPushMatrix();
+  	glTranslated(65, 5, 115);
+    pagar();
+    glPopMatrix();
    
        	//Hamster Excercise
 	glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(-80, 0, 10);
+	//glColor3f(0.0, 0.1, 0.0);
+	glTranslated(-70, 8, 10);
 	glScalef (0.75, 0.75, 0.75);
    HamsterExcercise();
     glPopMatrix();
 
-   /*
-   //pagar
-   glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(70, 28, 5);
-	 glRotatef (-90, 0, 1, 0);
-       glScalef (1, 1, 1);
-   pagar();
+    //Terowongan
+	glPushMatrix();
+	glTranslated(90, 17, 30);
+    terowongan();
     glPopMatrix();
-   */
+
 	//Bola
 	glPushMatrix();
-	glTranslated(50, 14, 70);
+	glTranslated(-50, 20, -50);
     bola();
     glPopMatrix();
+    
+    //pohon1
+   	glPushMatrix();
+	glTranslated(-60, 5, 70);
+    pohon();
+    glPopMatrix();
+     //pohon2
+   	glPushMatrix();
+	glTranslated(-40, 5, 70);
+    pohon();
+    glPopMatrix();
+   //pohon3
+   	glPushMatrix();
+	glTranslated(-70, 5, 70);
+    pohon();
+    glPopMatrix();
+  
+ 
+  //tempat minum
+  glPushMatrix();
+  glTranslated(10, 0, -10);
+  tempatminum();
+    glPopMatrix();
+  
+   
+ //tempat makan
+  glPushMatrix();
+  	glTranslated(65, 5, 115);
+    tempatmakan();
+    glPopMatrix();
+    
+    
     
     glutSwapBuffers();
 	glFlush();
