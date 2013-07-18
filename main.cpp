@@ -444,6 +444,7 @@ void display(void) {
 
 
    }
+  // pager 4
   for (float dep=-85;dep<=70;dep+=25)
          {
       glPushMatrix();
