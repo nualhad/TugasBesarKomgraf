@@ -14,8 +14,8 @@ GLuint texture[2];
 
 float lastx, lasty;
 GLint stencilBits;
-static int Vx = 80;
-static int Vy = 84;
+static int Vx = -72;
+static int Vy = 80;
 static int Vz = 100;
 
 float rot = 0;
@@ -160,7 +160,7 @@ void rumah()
 	//menggambar kubus dan transformasi tarnslasi ke titik 0.5 0.5 0.5 dan skala 1 1 1
 	//dinding
 	glPushMatrix();
-	 glColor3f(0,1,4.5);
+	 glColor3f(0,0.7,0.5);
 	glTranslated(0.5,20,0.5);//cube
 	glScaled(3.0, 2.0, 3);
 	glutSolidCube(15);
@@ -168,7 +168,16 @@ void rumah()
 	glPopMatrix();
 	//}
 
-	
+	//pintu depan
+	glPushMatrix();
+	//glEnable(GL_COLOR_MATERIAL);
+	glColor3f(0,0.6,0.4);
+	glTranslated(0,16,0.5);
+	glScalef(9,5,7);
+	glutSolidCube(5);
+	//glDisable(GL_COLOR_MATERIAL);
+	glPopMatrix();
+
 //void ataprumah()
 //{
        
@@ -182,65 +191,10 @@ void rumah()
 	glutSolidOctahedron();
 	glPopMatrix();
 	
-	//pintu depan
-glPushMatrix();
-//glEnable(GL_COLOR_MATERIAL);
-glColor3f(0.5,-0.76,0);
-glTranslated(0.5,12,0.5);
-glScalef(9,6,3);
-glutSolidCube(5);
-//glDisable(GL_COLOR_MATERIAL);
-glPopMatrix();
 
 }
 //test 
 
-/*void pagar(){
-     
- //pagar depan kiri
-       glPushMatrix ();
-              glColor3f (5 , 3, 9);
-              glTranslatef (-32 , -18, 60);
-              glRotatef (90, 0, 1, 0);
-              glScalef (1, 10, 36.5);
-              glutSolidCube(1.2);
-       glPopMatrix ();
-
-       //pagar depan kanan
-       glPushMatrix ();
-              glColor3f (8 , 0, 4);
-              glTranslatef (32 , -18, 60);
-              glRotatef (90, 0, 1, 0);
-              glScalef (1, 10, 36.5);
-              glutSolidCube(1.2);
-       glPopMatrix ();
-
-       //pagar belakang
-       glPushMatrix ();
-              glColor3f (8 , 0, 4);
-              glTranslatef (0 , -18, -14.5);
-              glRotatef (90, 0, 1, 0);
-              glScalef (1, 10, 90);
-              glutSolidCube(1.2);
-       glPopMatrix ();
-
-       //pagar kiri
-       glPushMatrix ();
-              glColor3f (8 , 0, 4);
-              glTranslatef (53.5 , -18, 25);
-              glScalef (1, 10, 65);
-              glutSolidCube(1.2);
-       glPopMatrix ();
-
-       //pagar kiri
-       glPushMatrix ();
-              glColor3f (8 , 0, 4);
-              glTranslatef (-53.5 , -18, 25);
-              glScalef (1, 10, 65);
-              glutSolidCube(1.2);
-       glPopMatrix ();
-     }
-*/
 //Hamster Exercise
 void HamsterExcercise() {
 	glPushMatrix();
@@ -287,6 +241,99 @@ void bola () {
         glutSolidSphere (20, 7, 7); //create ball.
 }
 
+void pager1()
+{
+ //Pager
+              //glEnable(GL_COLOR_MATERIAL);
+              glPushMatrix();
+              glTranslatef(5,-5.5,13);
+              glColor3f (0.2, 0.4, 1.0);
+              glScalef(10,0.5,0.75);
+              glutSolidCube(4);
+              glPopMatrix();
+             // glDisable(GL_COLOR_MATERIAL);
+
+              glPushMatrix();
+              glTranslatef(5,-13,13);
+              glColor3f (0.2, 0.4, 1.0);
+              glScalef(10,0.5,0.75);
+              glutSolidCube(4);
+              glPopMatrix();
+
+ for (float dep=0.2;dep<13;dep+=2)
+       {
+              //glEnable(GL_COLOR_MATERIAL);
+              glPushMatrix();
+              glTranslatef(dep,-13,13);
+             glColor3f(0.8,0.2,0.5);
+              glScalef(1,15,1);
+              glutSolidCube(2);
+              glPopMatrix();
+             // glDisable(GL_COLOR_MATERIAL);
+       }
+}
+void pager2()
+{
+ //Pager
+              //glEnable(GL_COLOR_MATERIAL);
+              glPushMatrix();
+              glTranslatef(5,-5.5,13);
+              glColor3f (0.2, 0.4, 1.0);
+              glScalef(10,0.5,0.75);
+              glutSolidCube(4);
+              glPopMatrix();
+             // glDisable(GL_COLOR_MATERIAL);
+
+              glPushMatrix();
+              glTranslatef(5,-13,13);
+              glColor3f (0.2, 0.4, 1.0);
+              glScalef(10,0.5,0.75);
+              glutSolidCube(4);
+              glPopMatrix();
+
+ for (float dep=0.5;dep<13;dep+=2)
+       {
+              //glEnable(GL_COLOR_MATERIAL);
+              glPushMatrix();
+              glTranslatef(dep,-13,13);
+             glColor3f(0.8,0.2,0.5);
+              glScalef(1,15,1);
+              glutSolidCube(2);
+              glPopMatrix();
+             // glDisable(GL_COLOR_MATERIAL);
+       }
+}
+void pager3()
+{
+ //Pager
+	 //glEnable(GL_COLOR_MATERIAL);
+	              glPushMatrix();
+	              glTranslatef(5,-5.5,13);
+	              glColor3f (0.2, 0.4, 1.0);
+	              glScalef(10,0.5,0.75);
+	              glutSolidCube(4);
+	              glPopMatrix();
+	             // glDisable(GL_COLOR_MATERIAL);
+
+	              glPushMatrix();
+	              glTranslatef(5,-13,13);
+	              glColor3f (0.2, 0.4, 1.0);
+	              glScalef(10,0.5,0.75);
+	              glutSolidCube(4);
+	              glPopMatrix();
+
+ for (float dep=0.5;dep<13;dep+=2)
+       {
+	 //glEnable(GL_COLOR_MATERIAL);
+	               glPushMatrix();
+	               glTranslatef(dep,-13,13);
+	              glColor3f(0.8,0.2,0.5);
+	               glScalef(1,15,1);
+	               glutSolidCube(2);
+	               glPopMatrix();
+	              // glDisable(GL_COLOR_MATERIAL);
+       }
+}
 void display(void) {
 	glClearStencil(0); //clear the stencil buffer
 	glClearDepth(1.0f);
@@ -341,38 +388,74 @@ void display(void) {
 	glTranslated(0.0, 100.0, 0.0);
 	AtasKandang(10);
 	glPopMatrix();
-    
-  
+
+
     	//rumah
 	glPushMatrix();
 	glColor3f(0.0, 0.1, 0.0);
 	glTranslated(50, 0, 10);
     rumah();
     glPopMatrix();
-   
+
        	//Hamster Excercise
 	glPushMatrix();
 	glColor3f(0.0, 0.1, 0.0);
 	glTranslated(-80, 0, 10);
    HamsterExcercise();
     glPopMatrix();
-  /* 
+
+
    //pagar
+
+  for (float dep=-80;dep<=70;dep+=30)
+      {
    glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(70, 28, 5);
+	//glColor3f(0.0, 0.1, 0.0);
+	glTranslated(105, 25, dep);
 	 glRotatef (-90, 0, 1, 0);
        glScalef (1, 1, 1);
-   pagar();
+   pager1();
     glPopMatrix();
-    */
-	//Bola
-	glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(30, 10, 10);
-   bola();
-    glPopMatrix();
-    
+
+
+}
+
+  for (float dep=-80;dep<=70;dep+=30)
+        {
+     glPushMatrix();
+  	//glColor3f(0.0, 0.1, 0.0);
+  	glTranslated(-87, 25, dep);
+  	 glRotatef (-90, 0, 1, 0);
+         glScalef (1, 1, 1);
+     pager2();
+      glPopMatrix();
+
+
+  }
+  for (float dep=-85;dep<=70;dep+=30)
+         {
+      glPushMatrix();
+   	//glColor3f(0.0, 0.1, 0.0);
+   	glTranslated(dep, 25, 87);
+   	 glRotatef (0, 0, 1, 0);
+          glScalef (1, 1, 1);
+      pager3();
+       glPopMatrix();
+
+
+   }
+  for (float dep=-85;dep<=70;dep+=25)
+         {
+      glPushMatrix();
+   	//glColor3f(0.0, 0.1, 0.0);
+   	glTranslated(dep, 25, -113);
+   	 glRotatef (0, 0, 1, 0);
+          glScalef (1, 1, 1);
+      pager3();
+       glPopMatrix();
+
+
+   }
     glutSwapBuffers();
 	glFlush();
 	rot++;
