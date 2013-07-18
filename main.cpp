@@ -187,15 +187,15 @@ glPushMatrix();
 //glEnable(GL_COLOR_MATERIAL);
 glColor3f(0.5,-0.76,0);
 glTranslated(0.5,12,0.5);
-glScalef(9,6,3);
+glScalef(9,6,5);
 glutSolidCube(5);
 //glDisable(GL_COLOR_MATERIAL);
 glPopMatrix();
 
 }
-//test 
 
-/*void pagar(){
+/*
+void pagar(){
      
  //pagar depan kiri
        glPushMatrix ();
@@ -282,9 +282,9 @@ void HamsterExcercise() {
 }
 //bola
 void bola () {
-        glColor3f(10.0, 10.0, 10.0); //set ball colour
+        glColor3f(0.0, 1.0, 0.0); //set ball colour
         glTranslatef(0.0,0.0,1); //moving it toward the screen a bit on creation
-        glutSolidSphere (20, 7, 7); //create ball.
+        glutSolidSphere (10, 7, 7); //create ball.
 }
 
 void display(void) {
@@ -354,9 +354,11 @@ void display(void) {
 	glPushMatrix();
 	glColor3f(0.0, 0.1, 0.0);
 	glTranslated(-80, 0, 10);
+	glScalef (0.75, 0.75, 0.75);
    HamsterExcercise();
     glPopMatrix();
-  /* 
+
+   /*
    //pagar
    glPushMatrix();
 	glColor3f(0.0, 0.1, 0.0);
@@ -365,12 +367,11 @@ void display(void) {
        glScalef (1, 1, 1);
    pagar();
     glPopMatrix();
-    */
+   */
 	//Bola
 	glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(30, 10, 10);
-   bola();
+	glTranslated(50, 14, 70);
+    bola();
     glPopMatrix();
     
     glutSwapBuffers();
