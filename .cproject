@@ -40,6 +40,9 @@
 									<listOptionValue builtIn="false" value="glu32"/>
 									<listOptionValue builtIn="false" value="freeglut"/>
 								</option>
+								<option id="gnu.cpp.link.option.paths.2111765317" name="Library search path (-L)" superClass="gnu.cpp.link.option.paths" valueType="libPaths">
+									<listOptionValue builtIn="false" value="&quot;C:\MinGW\lib&quot;"/>
+								</option>
 								<inputType id="cdt.managedbuild.tool.gnu.cpp.linker.input.1860624517" superClass="cdt.managedbuild.tool.gnu.cpp.linker.input">
 									<additionalInput kind="additionalinputdependency" paths="$(USER_OBJS)"/>
 									<additionalInput kind="additionalinput" paths="$(LIBS)"/>
@@ -111,7 +114,14 @@
 		<project id="TugasBesarKomgraf.cdt.managedbuild.target.gnu.cygwin.exe.1709139360" name="Executable" projectType="cdt.managedbuild.target.gnu.cygwin.exe"/>
 	</storageModule>
 	<storageModule moduleId="org.eclipse.cdt.core.LanguageSettingsProviders"/>
-	<storageModule moduleId="refreshScope"/>
+	<storageModule moduleId="refreshScope" versionNumber="2">
+		<configuration configurationName="Release">
+			<resource resourceType="PROJECT" workspacePath="/TugasBesarKomgraf"/>
+		</configuration>
+		<configuration configurationName="Debug">
+			<resource resourceType="PROJECT" workspacePath="/TugasBesarKomgraf"/>
+		</configuration>
+	</storageModule>
 	<storageModule moduleId="scannerConfiguration">
 		<autodiscovery enabled="true" problemReportingEnabled="true" selectedProfileId=""/>
 		<scannerConfigBuildInfo instanceId="cdt.managedbuild.config.gnu.cygwin.exe.release.897610491;cdt.managedbuild.config.gnu.cygwin.exe.release.897610491.;cdt.managedbuild.tool.gnu.cpp.compiler.cygwin.exe.release.871527064;cdt.managedbuild.tool.gnu.cpp.compiler.input.cygwin.2039185694">
