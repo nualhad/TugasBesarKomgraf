@@ -1,24 +1,351 @@
-
+/*
+ * Nurul Al Hadi
+ *
+ *
+ */
 #include <windows.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <iostream>
 #include <math.h>
+#ifdef __APPLE__
+#include <OpenGL/OpenGL.h>
+#include <GLUT/glut.h>
+#else
 #include <GL/glut.h>
 #include <GL/glu.h>
 #include <GL/gl.h>
+#include "imageloader.h"
+#include "vec3f.h"
+#endif
 
-static GLfloat spin = 0.0;
+
+
+static GLfloat spin, spin2 = 0.0;
 float angle = 0;
-GLuint texture[2];
+using namespace std;
 
 float lastx, lasty;
 GLint stencilBits;
-static int Vx = -72;
-static int Vy = 80;
-static int Vz = 100;
+static int viewx = -200;
+static int viewy = 100;
+static int viewz = 200;
 
 float rot = 0;
+
+GLuint texture[2]; //array untuk texture
+
+//GLint slices = 16;
+//GLint stacks = 16;
+
+struct Images {
+	unsigned long sizeX;
+	unsigned long sizeY;
+	char *data;
+};
+typedef struct Images Images;
+//class untuk terain 2D
+class Terrain {
+private:
+	int w; //Width
+	int l; //Length
+	float** hs; //Heights
+	Vec3f** normals;
+	bool computedNormals; //Whether normals is up-to-date
+public:
+	Terrain(int w2, int l2) {
+		w = w2;
+		l = l2;
+
+		hs = new float*[l];
+		for (int i = 0; i < l; i++) {
+			hs[i] = new float[w];
+		}
+
+		normals = new Vec3f*[l];
+		for (int i = 0; i < l; i++) {
+			normals[i] = new Vec3f[w];
+		}
+
+		computedNormals = false;
+	}
+
+	~Terrain() {
+		for (int i = 0; i < l; i++) {
+			delete[] hs[i];
+		}
+		delete[] hs;
+
+		for (int i = 0; i < l; i++) {
+			delete[] normals[i];
+		}
+		delete[] normals;
+	}
+
+	int width() {
+		return w;
+	}
+
+	int length() {
+		return l;
+	}
+
+	//Sets the height at (x, z) to y
+	void setHeight(int x, int z, float y) {
+		hs[z][x] = y;
+		computedNormals = false;
+	}
+
+	//Returns the height at (x, z)
+	float getHeight(int x, int z) {
+		return hs[z][x];
+	}
+
+	//Computes the normals, if they haven't been computed yet
+	void computeNormals() {
+		if (computedNormals) {
+			return;
+		}
+
+		//Compute the rough version of the normals
+		Vec3f** normals2 = new Vec3f*[l];
+		for (int i = 0; i < l; i++) {
+			normals2[i] = new Vec3f[w];
+		}
+
+		for (int z = 0; z < l; z++) {
+			for (int x = 0; x < w; x++) {
+				Vec3f sum(0.0f, 0.0f, 0.0f);
+
+				Vec3f out;
+				if (z > 0) {
+					out = Vec3f(0.0f, hs[z - 1][x] - hs[z][x], -1.0f);
+				}
+				Vec3f in;
+				if (z < l - 1) {
+					in = Vec3f(0.0f, hs[z + 1][x] - hs[z][x], 1.0f);
+				}
+				Vec3f left;
+				if (x > 0) {
+					left = Vec3f(-1.0f, hs[z][x - 1] - hs[z][x], 0.0f);
+				}
+				Vec3f right;
+				if (x < w - 1) {
+					right = Vec3f(1.0f, hs[z][x + 1] - hs[z][x], 0.0f);
+				}
+
+				if (x > 0 && z > 0) {
+					sum += out.cross(left).normalize();
+				}
+				if (x > 0 && z < l - 1) {
+					sum += left.cross(in).normalize();
+				}
+				if (x < w - 1 && z < l - 1) {
+					sum += in.cross(right).normalize();
+				}
+				if (x < w - 1 && z > 0) {
+					sum += right.cross(out).normalize();
+				}
+
+				normals2[z][x] = sum;
+			}
+		}
+
+		//Smooth out the normals
+		const float FALLOUT_RATIO = 0.5f;
+		for (int z = 0; z < l; z++) {
+			for (int x = 0; x < w; x++) {
+				Vec3f sum = normals2[z][x];
+
+				if (x > 0) {
+					sum += normals2[z][x - 1] * FALLOUT_RATIO;
+				}
+				if (x < w - 1) {
+					sum += normals2[z][x + 1] * FALLOUT_RATIO;
+				}
+				if (z > 0) {
+					sum += normals2[z - 1][x] * FALLOUT_RATIO;
+				}
+				if (z < l - 1) {
+					sum += normals2[z + 1][x] * FALLOUT_RATIO;
+				}
+
+				if (sum.magnitude() == 0) {
+					sum = Vec3f(0.0f, 1.0f, 0.0f);
+				}
+				normals[z][x] = sum;
+			}
+		}
+
+		for (int i = 0; i < l; i++) {
+			delete[] normals2[i];
+		}
+		delete[] normals2;
+
+		computedNormals = true;
+	}
+
+	//Returns the normal at (x, z)
+	Vec3f getNormal(int x, int z) {
+		if (!computedNormals) {
+			computeNormals();
+		}
+		return normals[z][x];
+	}
+};
+//end class
+
+//Loads a terrain from a heightmap.  The heights of the terrain range from
+//-height / 2 to height / 2.
+Terrain* loadTerrain(const char* filename, float height) {
+	Image* image = loadBMP(filename);
+	Terrain* t = new Terrain(image->width, image->height);
+	for (int y = 0; y < image->height; y++) {
+		for (int x = 0; x < image->width; x++) {
+			unsigned char color = (unsigned char) image->pixels[3 * (y
+					* image->width + x)];
+			float h = height * ((color / 255.0f) - 0.5f);
+			t->setHeight(x, y, h);
+		}
+	}
+
+	delete image;
+	t->computeNormals();
+	return t;
+}
+
+float _angle = 45.0f;
+
+Terrain* _terrainBukit;
+Terrain* _terrainAir;
+
+
+void cleanup() {
+delete _terrainBukit;
+delete _terrainAir;
+}
+
+/*
+
+int ImageLoad(char *filename, Images *image) {
+	FILE *file;
+	unsigned long size;
+	unsigned long i;
+	unsigned short int plane;
+
+	unsigned short int bpp;
+	char temp;
+
+
+	if ((file = fopen(filename, "rb")) == NULL) {
+		printf("File Not Found : %s\n", filename);
+		return 0;
+	}
+
+	fseek(file, 18, SEEK_CUR);
+
+	if ((i = fread(&image->sizeX, 4, 1, file)) != 1) {
+		printf("Error reading width from %s.\n", filename);
+		return 0;
+	}
+
+	if ((i = fread(&image->sizeY, 4, 1, file)) != 1) {
+		printf("Error reading height from %s.\n", filename);
+		return 0;
+	}
+
+	size = image->sizeX * image->sizeY * 3;
+	// read the planes
+	if ((fread(&plane, 2, 1, file)) != 1) {
+		printf("Error reading planes from %s.\n", filename);
+		return 0;
+	}
+	if (plane != 1) {
+		printf("Planes from %s is not 1: %u\n", filename, plane);
+		return 0;
+	}
+	// read the bitsperpixel
+	if ((i = fread(&bpp, 2, 1, file)) != 1) {
+		printf("Error reading bpp from %s.\n", filename);
+
+		return 0;
+	}
+	if (bpp != 24) {
+		printf("Bpp from %s is not 24: %u\n", filename, bpp);
+		return 0;
+	}
+	// seek past the rest of the bitmap header.
+	fseek(file, 24, SEEK_CUR);
+	// read the data.
+	image->data = (char *) malloc(size);
+	if (image->data == NULL) {
+		printf("Error allocating memory for color-corrected image data");
+		return 0;
+	}
+	if ((i = fread(image->data, size, 1, file)) != 1) {
+		printf("Error reading image data from %s.\n", filename);
+		return 0;
+	}
+	for (i = 0; i < size; i += 3) {
+		temp = image->data[i];
+		image->data[i] = image->data[i + 2];
+		image->data[i + 2] = temp;
+	}
+	//
+	return 1;
+}
+
+
+
+
+
+Images * loadTexture() {
+	Images *image1;
+
+	image1 = (Images *) malloc(sizeof(Images));
+	if (image1 == NULL) {
+		printf("Error allocating space for image");
+		exit(0);
+	}
+
+	if (!ImageLoad("grass.bmp", image1)) {
+		exit(1);
+	}
+	return image1;
+}
+
+
+Images * loadTextureSatu() {
+	Images *image1;
+
+	image1 = (Images *) malloc(sizeof(Images));
+	if (image1 == NULL) {
+		printf("Error allocating space for image");
+		exit(0);
+	}
+
+	if (!ImageLoad("balon.bmp", image1)) {
+		exit(1);
+	}
+	return image1;
+}
+
+Images * loadTextureDua() {
+	Images *image1;
+	// alokasi memmory untuk tekstur
+	image1 = (Images *) malloc(sizeof(Images));
+	if (image1 == NULL) {
+		printf("Error allocating space for image");
+		exit(0);
+	}
+
+	if (!ImageLoad("kotak.bmp", image1)) {
+		exit(1);
+	}
+	return image1;
+}
+*/
+
 
 void initRendering() {
 	glEnable(GL_DEPTH_TEST);
@@ -29,7 +356,128 @@ void initRendering() {
 	glShadeModel(GL_SMOOTH);
 }
 
-float _angle = 60.0f;
+
+
+
+
+
+
+void drawScene() {
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	float scale = 500.0f / max(_terrainBukit->width() - 1, _terrainBukit->length() - 1);
+	glScalef(scale, scale, scale);
+	glTranslatef(-(float) (_terrainBukit->width() - 1) / 2, 0.0f,
+			-(float) (_terrainBukit->length() - 1) / 2);
+
+	glColor3f(0.3f, 0.9f, 0.0f);
+	for (int z = 0; z < _terrainBukit->length() - 1; z++) {
+		//Makes OpenGL draw a triangle at every three consecutive vertices
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int x = 0; x < _terrainBukit->width(); x++) {
+			Vec3f normal = _terrainBukit->getNormal(x, z);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, _terrainBukit->getHeight(x, z), z);
+			normal = _terrainBukit->getNormal(x, z + 1);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, _terrainBukit->getHeight(x, z + 1), z + 1);
+		}
+		glEnd();
+	}
+
+}
+
+
+void gambarTanah(Terrain *terrain, GLfloat r, GLfloat g, GLfloat b) {
+
+	float scale = 400.0f / max(terrain->width() - 1, terrain->length() - 1);
+	glScalef(scale, scale, scale);
+	glTranslatef(-(float) (terrain->width() - 1) / 2, 0.0f,
+			-(float) (terrain->length() - 1) / 2);
+
+	glColor3f(r, g, b);
+	for (int z = 0; z < terrain->length() - 1; z++) {
+		//Makes OpenGL draw a triangle at every three consecutive vertices
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int x = 0; x < terrain->width(); x++) {
+			Vec3f normal = terrain->getNormal(x, z);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, terrain->getHeight(x, z), z);
+			normal = terrain->getNormal(x, z + 1);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, terrain->getHeight(x, z + 1), z + 1);
+		}
+		glEnd();
+	}
+
+}
+
+void gambarAir(Terrain *terrain, GLfloat r, GLfloat g, GLfloat b) {
+
+	float scale = 350.0f / max(terrain->width() - 1, terrain->length() - 1);
+	glScalef(scale, scale, scale);
+	glTranslatef(-(float) (terrain->width() - 1) / 2, 0.0f,
+			-(float) (terrain->length() - 1) / 2);
+
+	glColor3f(r, g, b);
+	for (int z = 0; z < terrain->length() - 1; z++) {
+		//Makes OpenGL draw a triangle at every three consecutive vertices
+		glBegin(GL_TRIANGLE_STRIP);
+		for (int x = 0; x < terrain->width(); x++) {
+			Vec3f normal = terrain->getNormal(x, z);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, terrain->getHeight(x, z), z);
+			normal = terrain->getNormal(x, z + 1);
+			glNormal3f(normal[0], normal[1], normal[2]);
+			glVertex3f(x, terrain->getHeight(x, z + 1), z + 1);
+		}
+		glEnd();
+	}
+
+}
+
+
+
+
+
+
+void update(int value) {
+
+	glutPostRedisplay();
+	glutTimerFunc(25, update, 0);
+}
+
+
+void freetexture(GLuint texture) {
+	glDeleteTextures(2, &texture);
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const GLfloat light_ambient[] = { 0.3f, 0.3f, 0.3f, 1.0f };
 const GLfloat light_diffuse[] = { 0.7f, 0.7f, 0.7f, 1.0f };
@@ -44,668 +492,351 @@ const GLfloat mat_diffuse[] = { 0.8f, 0.8f, 0.8f, 1.0f };
 const GLfloat mat_specular[] = { 1.0f, 1.0f, 1.0f, 1.0f };
 const GLfloat high_shininess[] = { 100.0f };
 
-void patokan(int panjang) {
-	int x;
-	glPushMatrix();
-	for (x = 0; x < panjang; x++) {
-		glutSolidCube(10);
-		glTranslated(10.0, 0.0, 0.0);
-	}
-	glPopMatrix();
+/*
+unsigned int texture_balon;
+unsigned int texture_kotak;
+unsigned int LoadTextureFromBmpFile(char *filename);
+*/
 
-	glPushMatrix();
-	for (x = 0; x < panjang; x++) {
-		glTranslated(-10.0, 0.0, 0.0);
-		glutSolidCube(10);
-	}
-	glPopMatrix();
+void pohon(void){
+//batang
+GLUquadricObj *pObj;
+pObj =gluNewQuadric();
+gluQuadricNormals(pObj, GLU_SMOOTH);
+
+glPushMatrix();
+glColor3ub(104,70,14);
+glRotatef(270,1,0,0);
+gluCylinder(pObj, 4, 0.7, 30, 25, 25);
+glPopMatrix();
 }
-
-//cylinder dibuat beberapa objek dari solid cone sama solidtorus (payung)
-void cylinder(float alas, float atas, float tinggi) {
-	float i;
-	glPushMatrix();
-	glTranslatef(1.0, 0.0, -alas / 8);
-	glutSolidCone(alas, 0, 32, 4);
-	for (i = 0; i <= tinggi; i += alas / 24)
-	{
-		glTranslatef(0.0, 0.0, alas / 24);
-		glutSolidTorus(alas / 4, alas - ((i * (alas - atas)) / tinggi), 16, 16);
-	}
-	glTranslatef(0.0, 0.0, alas / 4);
-	glutSolidCone(atas, 0, 20, 1);
-	glPopMatrix();
-}
-
-//segitiga dibuat jadi beberapa objek
-void segitiga() {
-	glBegin(GL_QUADS);
-	glVertex3f(-0.2, -0.2, -0.2);
-	glVertex3f(-0.2, -0.2, -0.2);
-	glVertex3f(-0.2, -0.2, -0.2);
-	glVertex3f(-0.2, -0.2, -0.2);
-	glEnd();
-
-//Sisi-sisi Prisma
-	glBegin(GL_TRIANGLES);
-	glColor3d(1.0f, 1.0f, 1.0f);
-//Segitiga Warna Merah
-	glVertex3f(-0.2, -0.2, -0.2);
-	glVertex3f(0.8, 0, 0);
-	glVertex3f(-0.2, 0.2, 0.2);
-//Segitiga Warna Hijau
-	glVertex3f(-2, 2, 2);
-	glVertex3f(8, 0, 0);
-	glVertex3f(-2, 2, -2);
-//Segitiga Warna Biru
-	glVertex3f(-2, 2, -2);
-	glVertex3f(8, 0, 0);
-	glVertex3f(-2, -2, -2);
-//Segitiga Warna Putih
-	glVertex3f(-2, -2, -2);
-	glVertex3f(8, 0, 0);
-	glVertex3f(-2, -2, 2);
-	glEnd();
-}
-//bawah kandang
-void bawahKandang(int lebar) {
-	int zplus;
-	int zmin;
-	patokan(10);
-	glPushMatrix();
-	for (zplus = 0; zplus < lebar; ++zplus) {
-		glTranslated(0.0, 0.0, 10.0);
-		patokan(10);
-	}
-	glPopMatrix();
-	glPushMatrix();
-	for (zmin = 0; zmin < lebar; ++zmin)
-	{
-		glTranslated(0.0, 0.0, -10.0);
-		patokan(10);
-	}
-	glPopMatrix();
-}
-
-// atas kandang
-void AtasKandang(int lebar) {
-	int zplus;
-	int zmin;
-	patokan(1);
-
-	glPushMatrix();
-
-	for (zplus = 0; zplus < lebar; ++zplus)
-	{
-		glTranslated(0.0, 0.0, 10.0);
-
-		patokan(10);
-	}
-	glPopMatrix();
-	glPushMatrix();
-	for (zmin = 0; zmin < lebar; ++zmin)
-	{
-		glTranslated(0.0, 0.0, -10.0);
-		patokan(10);
-	}
-	glPopMatrix();
-}
-
-void cube() {
-//menggambar kubus dan transformasi tarnslasi ke titik 0.5 0.5 0.5 dan skala 1 1 1
-	glPushMatrix();
-	glTranslated(0.5, 0.5, 0.5); //cube
-	glScaled(15.0, 15.0, 200);
-	glutSolidCube(1.0);
-	glRotatef(50, 0, 1, 0);
-	glPopMatrix();
-}
-
-
-	void rumah() {
-
-		//dinding
-		glPushMatrix();
-		glColor3f(1, 1, 0);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glTranslated(0.5, 20, 0.5); //cube
-		glScaled(3.0, 2.0, 3);
-		glutSolidCube(15);
-		glRotatef(50, 0, 1, 0);
-		glPopMatrix();
-
-		//pintu depan
-		glPushMatrix();
-		glColor3f(0.1, 0.1, 0.1);
-		glTranslated(0, 16, 0.5);
-		glScalef(9, 5, 7);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(5);
-		glPopMatrix();
-
-		//jendela
-		glPushMatrix();
-		glColor3f(0.1, 0.1, 0.1);
-		glTranslated(10, 16, 0.5);
-		glScalef(2, 2, 15.5);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(3);
-		glPopMatrix();
-
-		glPushMatrix();
-		glColor3f(0.1, 0.1, 0.1);
-		glTranslated(10, 23, 0.5);
-		glScalef(2, 2, 15.5);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(3);
-		glPopMatrix();
-
-		//jendela rumah2
-		glPushMatrix();
-		glColor3f(0.1, 0.1, 0.1);
-		glTranslated(2, 16, 0.5);
-		glScalef(2, 2, 15.5);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(3);
-		glPopMatrix();
-
-		glPushMatrix();
-		glColor3f(0.1, 0.1, 0.1);
-		glTranslated(2, 23, 0.5);
-		glScalef(2, 2, 15.5);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(3);
-		glPopMatrix();
-
-		//atap
-		glPushMatrix();
-		glColor3f(0.8, 0, 0);
-		glRotatef(45, 0, 1, 0);
-		glRotated(90, 0, 0, 1);
-		glTranslated(35, 2, 1);
-		glScaled(20.0, 38.0, 38.0);
-		glutSolidOctahedron();
-		glPopMatrix();
-
-		//cerobong
-		glPopMatrix();
-		glPushMatrix();
-		//glEnable(GL_COLOR_MATERIAL);
-		glColor3f(0.4, 0.4, 0.4);
-		glTranslated(45, 23,0);
-		glScalef(2, 20,2);
-		glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-		glutSolidCube(3);
-		glPopMatrix();
-	}
-//test
-void batubatu(){
-				glPushMatrix();
-				//glEnable(GL_COLOR_MATERIAL);
-				glColor3f(0.4, 0.4, 0.4);
-				glTranslated(10, 10,0);
-				glScalef(2,2,2);
-				glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-				glutSolidCube(1);
-				glPopMatrix();
-}
-
-void pagar() {
-
-	//pagar depan kiri
-	glPushMatrix();
-	glColor3f(5, 3, 9);
-	glTranslatef(-32, -18, 60);
-	glRotatef(90, 0, 1, 0);
-	glScalef(1, 10, 36.5);
-	glutSolidCube(1.2);
-	glPopMatrix();
-
-	//pagar depan kanan
-	glPushMatrix();
-	glColor3f(8, 0, 4);
-	glTranslatef(32, -18, 60);
-	glRotatef(90, 0, 1, 0);
-	glScalef(1, 10, 36.5);
-	glutSolidCube(1.2);
-	glPopMatrix();
-
-	//pagar belakang
-	glPushMatrix();
-	glColor3f(8, 0, 4);
-	glTranslatef(0, -18, -14.5);
-	glRotatef(90, 0, 1, 0);
-	glScalef(1, 10, 90);
-	glutSolidCube(1.2);
-	glPopMatrix();
-
-	//pagar kiri
-	glPushMatrix();
-	glColor3f(8, 0, 4);
-	glTranslatef(53.5, -18, 25);
-	glScalef(1, 10, 65);
-	glutSolidCube(1.2);
-	glPopMatrix();
-
-	//pagar kiri
-	glPushMatrix();
-	glColor3f(8, 0, 4);
-	glTranslatef(-53.5, -18, 25);
-	glScalef(1, 10, 65);
-	glutSolidCube(1.2);
-	glPopMatrix();
-}
-
-//Hamster Exercise
-void HamsterExcercise() {
-	//kaki kiri
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.903921568627451, 0.5215686274509804, 0.2470588235294118);
-	glTranslated(00.0, 20.0, -1.0);
-	glRotated(90, 1.0, 0.0, 0.0);
-	glRotated(30.0, 1.0, 0.0, 0.0);
-	cylinder(3.0, 3.0, 20.0);
-	glPopMatrix();
-
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.903921568627451, 0.5215686274509804, 0.2470588235294118);
-	glTranslated(00.0, 20.0, 1.0);
-	glRotated(90, 1.0, 0.0, 0.0);
-	glRotated(-30.0, 1.0, 0.0, 0.0);
-	cylinder(3.0, 3.0, 20.0);
-	glPopMatrix();
-
-	//alas
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.0, 0.0, 0.0);
-	//glTranslated(0.0, 5.0, 0.0);
-	glutSolidCube(10);
-	glTranslated(0.0, 0.0, 10.0); //0.0, -1.0, 10.0
-	glutSolidCube(10);
-	glTranslated(0.0, 0.0, -20.0);
-	glutSolidCube(10);
-	glPopMatrix();
-
-	//buletan
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0, 0, 205);
-	glTranslated(0.0, 40.0, 0.0);
-	glRotated(-90, 0.0, 1.0, 0.0);
-	cylinder(20.0, 20.0, 8.0);
-	glPopMatrix();
-}
-//pohon
-void pohon() {
-
-	//batang
-	GLUquadricObj *pObj;
-	pObj = gluNewQuadric();
-	gluQuadricNormals(pObj, GLU_SMOOTH);
-	glPushMatrix();
-	glColor3f(0.7, 0.3, 0);
-	glRotatef(270, 1, 0, 0);
-	glScaled(2, 2, 2);
-	gluCylinder(pObj, 1, 0.7, 10, 20, 15);
-	glPopMatrix();
 
 //ranting
-	glPushMatrix();
-	glColor3ub(104, 70, 14);
-	glScaled(2, 2, 2);
-	glTranslatef(0, 7, 0);
-	glRotatef(330, 1, 0, 0);
-	gluCylinder(pObj, 0.6, 0.1, 7, 25, 25);
-	glPopMatrix();
+void ranting(void){
+GLUquadricObj *pObj;
+pObj =gluNewQuadric();
+gluQuadricNormals(pObj, GLU_SMOOTH);
+glPushMatrix();
+glColor3ub(104,70,14);
+glTranslatef(0,27,0);
+glRotatef(330,1,0,0);
+gluCylinder(pObj, 0.6, 0.1, 15, 25, 25);
+glPopMatrix();
 
 //daun
-	glPushMatrix();
-	glColor3f(0, 1, 0.3);
-	glScaled(8, 6, 10);
-	glTranslatef(0, 4.7, 0.4);
-	glutSolidDodecahedron();
-	glPopMatrix();
+glPushMatrix();
+glColor3ub(18,118,13);
+glScaled(5, 5, 5);
+glTranslatef(0,7,3);
+glutSolidDodecahedron();
+glPopMatrix();
 }
 
-void bola() {
-	glColor3f(0.0, 1.0, 0.0); //set ball colour
-	glTranslatef(0.0, 0.0, 1); //moving it toward the screen a bit on creation
-	glutSolidSphere(15, 15, 15); //create ball.
-}
-
-//tempat makan
-void tempatmakan() {
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.1, 1.0, 1.0);
-	glScaled(0.5, 0.5, 0.5);
-	glTranslated(-60.0, 10.0, -60.0);
-	glRotated(-270.0, 1.0, 0.0, 0.0);
-	cylinder(15.0, 10.0, 3.0);
-	glPopMatrix();
-}
-
-//tempat minum
-void tempatminum() {
-	//tabung
-	glPushMatrix();
-	glColor3f(0.0, 2.0, 1.0);
-	glRotated(-90.0, 1.0, 0.0, 0.0);
-	glTranslated(-1, -95.0, 17);
-	cylinder(6.0, 6.0, 15.0);
-	glPopMatrix();
-
-	//sedotan
-	glPushMatrix();
-	glTranslated(0, 25, 96);
-	glRotated(180.0, 0.0, 1.0, 0.0);
-	glRotated(40.0, 1.0, 0.0, 0.0);
-	cylinder(1.0, 1.0, 15.0);
-	glPopMatrix();
-
-	//kotak bawah
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3d(0.803921568627451, 0.5215686274509804, 0.2470588235294118);
-	glTranslated(0.0, 12, 95);
-	glScaled(0.5, 1.5, 0.5);
-	glutSolidCube(20);
-	glPopMatrix();
-}
-
-void pager1() {
-	//Pager
-	//glEnable(GL_COLOR_MATERIAL);
-	glPushMatrix();
-	glTranslatef(5, -5.5, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-	// glDisable(GL_COLOR_MATERIAL);
-
-	glPushMatrix();
-	glTranslatef(5, -13, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-
-	for (float dep = 0.2; dep < 13; dep += 2) {
-		//glEnable(GL_COLOR_MATERIAL);
-		glPushMatrix();
-		glTranslatef(dep, -13, 13);
-		glColor3f(0.8, 0.2, 0.5);
-		glScalef(1, 15, 1);
-		glutSolidCube(2);
-		glPopMatrix();
-		// glDisable(GL_COLOR_MATERIAL);
-	}
-}
-void pager2() {
-	//Pager
-	//glEnable(GL_COLOR_MATERIAL);
-	glPushMatrix();
-	glTranslatef(5, -5.5, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-	// glDisable(GL_COLOR_MATERIAL);
-
-	glPushMatrix();
-	glTranslatef(5, -13, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-
-	for (float dep = 0.5; dep < 13; dep += 2) {
-		//glEnable(GL_COLOR_MATERIAL);
-		glPushMatrix();
-		glTranslatef(dep, -13, 13);
-		glColor3f(0.8, 0.2, 0.5);
-		glScalef(1, 15, 1);
-		glutSolidCube(2);
-		glPopMatrix();
-		// glDisable(GL_COLOR_MATERIAL);
-	}
-}
-void pager3() {
-	//Pager
-
-
-	glPushMatrix();
-	glTranslatef(5, -5.5, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-
-	glPushMatrix();
-	glTranslatef(5, -13, 13);
-	glColor3f(0.2, 0.4, 1.0);
-	glScalef(10, 0.5, 0.75);
-	glutSolidCube(4);
-	glPopMatrix();
-
-	for (float dep = 0.5; dep < 13; dep += 2)
-	{
-		glPushMatrix();
-		glTranslatef(dep, -13, 13);
-		glColor3f(0.8, 0.2, 0.5);
-		glScalef(1, 15, 1);
-		glutSolidCube(2);
-		glPopMatrix();
-	}
-}
-
-void terowongan() {
-	glPushMatrix();
-	glColor3f(0.7f, 1.0f, 0.7f);
-	glTranslated(-70, 0, -80);
-	glRotated(90.0, 0.0, 1.0, 0.0);
-	glRotated(40.0, 0.0, 0.0, 0.0);
-	cylinder(13.0, 13.0, 70.0);
-	glPopMatrix();
-}
-void display(void) {
+void display(void){
+//    glutSwapBuffers();
 	glClearStencil(0); //clear the stencil buffer
 	glClearDepth(1.0f);
-	glClearColor(0.8, 0.7, 0.8, 0.2);
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT); //clear the buffers
-	glLoadIdentity();
-	gluLookAt(Vx, Vy, Vz, 0.0, 0.0, 5.0, 0.0, 1.0, 0.0);
 
-// kayu-1
-	glPushMatrix();
-	glColor3d(0.0, 0.0, 0.0);
-	glRotated(-90, 1.0, 0.0, 0.0);
-	glTranslated(90.0, 100.0, 0.0);
-	cube();
-	glPopMatrix();
+	glClearColor(0.0, 0.6, 0.8, 1);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    glLoadIdentity();
+	gluLookAt(viewx, viewy, viewz, 0.0, 10.0, 0.0, 0.0, 1.0, 0.0);
+//gluLookAt(0.0,10.0,3.0,0.0,0.0,0.0,0.0,1.0,0.0);
 
-// kayu-2
-	glPushMatrix();
-	glRotated(-90, 1.0, 0.0, 0.0);
-	glTranslated(90.0, -100.0, 0.0);
-	cube();
+
+    glPushMatrix();
+    glPopMatrix();
+    glPushMatrix();
+
+	glBindTexture(GL_TEXTURE_2D, texture[0]);
+	gambarTanah(_terrainBukit, 0.3f, 0.9f, 0.0f);
 	glPopMatrix();
 
-// kayu-3
 	glPushMatrix();
-	glRotated(-90, 1.0, 0.0, 0.0);
-	glTranslated(-100.0, 100.0, 0.0);
-	cube();
-	glPopMatrix();
-
-// kayu-4
-	glPushMatrix();
-	glRotated(-90, 1.0, 0.0, 0.0);
-	glTranslated(-100.0, -100.0, 0.0);
-	cube();
-	glPopMatrix();
-
-//bawahkandang
-	glPushMatrix();
-	glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-	glColor3f(1.0, 0.4, 0.0);
-	bawahKandang(10);
-	glPopMatrix();
-
-//ataskandang
-	glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(0.0, 100.0, 0.0);
-	AtasKandang(10);
-	glPopMatrix();
-
-	//rumah
-	glPushMatrix();
-	glColor3f(0.0, 0.1, 0.0);
-	glTranslated(50, 0, 10);
-	rumah();
-	glPopMatrix();
-
-	//pagar
-	glPushMatrix();
-	glTranslated(65, 5, 115);
-	pagar();
-	glPopMatrix();
-
-	//Hamster Excercise
-	glPushMatrix();
-	glTranslated(-70, 8, 10);
-	glScalef(0.75, 0.75, 0.75);
-	HamsterExcercise();
-	glPopMatrix();
-
-	//Terowongan
-	glPushMatrix();
-	glTranslated(90, 17, 30);
-	terowongan();
-	glPopMatrix();
-
-	//Bola
-	glPushMatrix();
-	glTranslated(-50, 20, -50);
-	bola();
-	glPopMatrix();
-
-	//pohon1
-	glPushMatrix();
-	glTranslated(-60, 5, 70);
-	pohon();
-	glPopMatrix();
-	//pohon2
-	glPushMatrix();
-	glTranslated(-40, 5, 70);
-	pohon();
-	glPopMatrix();
-	//pohon3
-	glPushMatrix();
-	glTranslated(-90, 5, 70);
-	pohon();
-	glPopMatrix();
-
-	//tempat minum
-	glPushMatrix();
-	glTranslated(10, 0, -10);
-	tempatminum();
+	gambarAir(_terrainAir, 0.0f, 0.2f, 0.5f);
 	glPopMatrix();
 
 
-	//tempat makan
-	glPushMatrix();
-	glTranslated(65, 5, 115);
-	tempatmakan();
-	glPopMatrix();
 
-	//pagar
+//pohon1
+glPushMatrix();
+glTranslatef(-80,0,-120);
+glRotatef(90,0,1,0);
+pohon();
+ranting();
+glPushMatrix();
+glScalef(1.5, 1.5, 1.5);
+glTranslatef(0,25,25);
+glRotatef(250,1,0,0);
+ranting();
+glPopMatrix();
 
-	for (float dep = -80; dep <= 70; dep += 30) {
-		glPushMatrix();
-		//glColor3f(0.0, 0.1, 0.0);
-		glTranslated(105, 25, dep);
-		glRotatef(-90, 0, 1, 0);
-		glScalef(1, 1, 1);
-		pager1();
-		glPopMatrix();
+glPushMatrix();
+glScalef(1.8, 1.8, 1.8);
+glTranslatef(0,-6,21.5);
+glRotatef(-55,1,0,0);
+ranting();
+glPopMatrix();
+glPopMatrix();
 
-	}
+//pohon1
+glPushMatrix();
+glTranslatef(-30,0,-130);
+glRotatef(90,0,1,0);
+pohon();
+ranting();
+glPushMatrix();
+glScalef(1.5, 1.5, 1.5);
+glTranslatef(0,25,25);
+glRotatef(250,1,0,0);
+ranting();
+glPopMatrix();
 
-	for (float dep = -80; dep <= 70; dep += 30) {
-		glPushMatrix();
-		//glColor3f(0.0, 0.1, 0.0);
-		glTranslated(-87, 25, dep);
-		glRotatef(-90, 0, 1, 0);
-		glScalef(1, 1, 1);
-		pager2();
-		glPopMatrix();
+glPushMatrix();
+glScalef(1.8, 1.8, 1.8);
+glTranslatef(0,-6,21.5);
+glRotatef(-55,1,0,0);
+ranting();
+glPopMatrix();
+glPopMatrix();
 
-	}
-	for (float dep = -85; dep <= 70; dep += 30) {
-		glPushMatrix();
-		//glColor3f(0.0, 0.1, 0.0);
-		glTranslated(dep, 25, 87);
-		glRotatef(0, 0, 1, 0);
-		glScalef(1, 1, 1);
-		pager3();
-		glPopMatrix();
 
-	}
-	for (float dep = -85; dep <= 70; dep += 25) {
-		glPushMatrix();
-		//glColor3f(0.0, 0.1, 0.0);
-		glTranslated(dep, 25, -113);
-		glRotatef(0, 0, 1, 0);
-		glScalef(1, 1, 1);
-		pager3();
-		glPopMatrix();
+//p3
+glPushMatrix();
+glTranslatef(-135,0,-90);
+glRotatef(90,0,1,0);
+pohon();
+ranting();
+glPushMatrix();
+glScalef(1.5, 1.5, 1.5);
+glTranslatef(0,25,25);
+glRotatef(250,1,0,0);
+ranting();
+glPopMatrix();
 
-	}
-	glutSwapBuffers();
+glPushMatrix();
+glScalef(1.8, 1.8, 1.8);
+glTranslatef(0,-6,21.5);
+glRotatef(-55,1,0,0);
+ranting();
+glPopMatrix();
+glPopMatrix();
+
+
+//pohon4
+glPushMatrix();
+glTranslatef(-160,0,-60);
+glRotatef(90,0,1,0);
+pohon();
+ranting();
+glPushMatrix();
+glScalef(1.5, 1.5, 1.5);
+glTranslatef(0,25,25);
+glRotatef(250,1,0,0);
+ranting();
+glPopMatrix();
+
+glPushMatrix();
+glScalef(1.8, 1.8, 1.8);
+glTranslatef(0,-6,21.5);
+glRotatef(-55,1,0,0);
+ranting();
+glPopMatrix();
+glPopMatrix();
+glPopMatrix();
+
+
+//pohon5
+glPushMatrix();
+glTranslatef(-180,0,-0);
+glRotatef(90,0,1,0);
+pohon();
+ranting();
+glPushMatrix();
+glScalef(1.5, 1.5, 1.5);
+glTranslatef(0,25,25);
+glRotatef(250,1,0,0);
+ranting();
+glPopMatrix();
+
+glPushMatrix();
+glScalef(1.8, 1.8, 1.8);
+glTranslatef(0,-6,21.5);
+glRotatef(-55,1,0,0);
+ranting();
+glPopMatrix();
+glPopMatrix();
+glPopMatrix();
+
+    glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE); //disable the color mask
+	glDepthMask(GL_FALSE); //disable the depth mask
+
+	glEnable(GL_STENCIL_TEST); //enable the stencil testing
+
+	glStencilFunc(GL_ALWAYS, 1, 0xFFFFFFFF);
+	glStencilOp(GL_REPLACE, GL_REPLACE, GL_REPLACE); //set the stencil buffer to replace our next lot of data
+
+	//ground
+	//tanah(); //set the data plane to be replaced
+	glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE); //enable the color mask
+	glDepthMask(GL_TRUE); //enable the depth mask
+
+	glStencilFunc(GL_EQUAL, 1, 0xFFFFFFFF);
+	glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP); //set the stencil buffer to keep our next lot of data
+
+	glDisable(GL_DEPTH_TEST); //disable depth testing of the reflection
+
+	// glPopMatrix();
+	glEnable(GL_DEPTH_TEST); //enable the depth testing
+	glDisable(GL_STENCIL_TEST); //disable the stencil testing
+	//end of ground
+	glEnable(GL_BLEND); //enable alpha blending
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); //set the blending function
+	glRotated(1, 0, 0, 0);
+
+	glDisable(GL_BLEND);
+
+    glutSwapBuffers();
 	glFlush();
 	rot++;
 	angle++;
 }
 
-void init(void) {
-	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_LIGHTING);
-	glEnable(GL_LIGHT0);
+
+void init(void){
+
+glEnable(GL_DEPTH_TEST);
+glEnable(GL_LIGHTING);
+glEnable(GL_LIGHT0);
+
 	glDepthFunc(GL_LESS);
 	glEnable(GL_NORMALIZE);
-	glEnable(GL_COLOR_MATERIAL);
+    glEnable(GL_COLOR_MATERIAL);
 	glDepthFunc(GL_LEQUAL);
 	glShadeModel(GL_SMOOTH);
 	glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
 	glEnable(GL_CULL_FACE);
+
+glEnable(GL_TEXTURE_2D);
+glEnable(GL_TEXTURE_GEN_S);
+glEnable(GL_TEXTURE_GEN_T);
+
+initRendering();
+_terrainBukit = loadTerrain("TerrainBukit.bmp", 8);
+_terrainAir = loadTerrain("TerrainAir.bmp",0);
+
+
+
+
+
+
+/*
+Images *image1 = loadTexture();
+Images *image2 = loadTextureSatu();
+Images *image3 = loadTextureDua();
+
+if (image1 == NULL) {
+		printf("Image was not returned from loadTexture\n");
+		exit(0);
+	}
+
+glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+
+	// Generate texture/ membuat texture
+	glGenTextures(2, texture);
+
+------------tekstur balon---------------
+
+	//binding texture untuk membuat texture 2D
+	glBindTexture(GL_TEXTURE_2D, texture[1]);
+
+
+    glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_SPHERE_MAP);
+
+	//menyesuaikan ukuran textur ketika image lebih besar dari texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); //
+	//menyesuaikan ukuran textur ketika image lebih kecil dari texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); //
+
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, image2->sizeX, image2->sizeY, 0, GL_RGB,
+			GL_UNSIGNED_BYTE, image2->data);
+*/
+
+
+/*
+------------tekstur kotak---------------
+
+	//binding texture untuk membuat texture 2D
+	glBindTexture(GL_TEXTURE_2D, texture[2]);
+
+
+	//menyesuaikan ukuran textur ketika image lebih besar dari texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR); //
+	//menyesuaikan ukuran textur ketika image lebih kecil dari texture
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR); //
+
+	glTexImage2D(GL_TEXTURE_2D, 0, 3, image3->sizeX, image3->sizeY, 0, GL_RGB,
+			GL_UNSIGNED_BYTE, image3->data);
+
+
+
+
+	//baris tekstur buatan #belang
+	glTexEnvf(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+
+
+*/
 }
+
+
+
+
+
+
+
+
+
+
+
+void reshape(int w, int h){
+glViewport(0, 0 , (GLsizei) w,(GLsizei)h);
+glMatrixMode(GL_PROJECTION);
+glLoadIdentity();
+
+
+gluPerspective(45, (GLfloat) w / (GLfloat) h, 0.1, 1000.0);
+glMatrixMode(GL_MODELVIEW);
+
+}
+
+
+
+
+
+
+
 
 static void keyboard(int key, int x, int y) {
 	switch (key) {
 	case GLUT_KEY_HOME:
-		Vy++;
+		viewy++;
 		break;
 	case GLUT_KEY_END:
-		Vy--;
+		viewy--;
 		break;
 	case GLUT_KEY_UP:
-		Vz--;
+		viewz--;
 		break;
 	case GLUT_KEY_DOWN:
-		Vz++;
+		viewz++;
 		break;
 
 	case GLUT_KEY_RIGHT:
-		Vx++;
+		viewx++;
 		break;
 	case GLUT_KEY_LEFT:
-		Vx--;
+		viewx--;
 		break;
 
 	case GLUT_KEY_F1: {
@@ -742,41 +873,35 @@ void keyboard(unsigned char key, int x, int y) {
 			spin = spin - 360.0;
 	}
 	if (key == 'q') {
-		Vz += 5;
+		viewz++;
 	}
 	if (key == 'e') {
-		Vz -= 5;
+		viewz--;
 	}
 	if (key == 's') {
-		Vy -= 5;
+		viewy--;
 	}
 	if (key == 'w') {
-		Vy += 5;
+		viewy++;
 	}
 }
 
-void reshape(int w, int h) {
-	glViewport(0, 0, (GLsizei) w, (GLsizei) h);
-	glMatrixMode(GL_PROJECTION);
-	glLoadIdentity();
-	gluPerspective(60, (GLfloat) w / (GLfloat) h, 0.1, 1000.0);
-	glMatrixMode(GL_MODELVIEW);
-}
 
-int main(int argc, char **argv) {
-	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_STENCIL | GLUT_DEPTH); //add a stencil buffer to the window
-	glutInitWindowSize(800, 600);
-	glutInitWindowPosition(100, 100);
-	glutCreateWindow("Hamster Cage ala chef");
-	init();
 
-	glutDisplayFunc(display);
-	glutIdleFunc(display);
-	glutReshapeFunc(reshape);
-	glutSpecialFunc(keyboard);
+int main(int argc, char** argv){
+glutInit(&argc, argv);
+glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_STENCIL | GLUT_DEPTH); //add a stencil buffer to the window
+glutInitWindowSize(800,600);
+glutInitWindowPosition(100,100);
+glutCreateWindow("Taman Kincir Belanda");
+init();
 
-	glutKeyboardFunc(keyboard);
+glutDisplayFunc(display);
+glutIdleFunc(display);
+glutReshapeFunc(reshape);
+
+glutKeyboardFunc (keyboard);
+glutSpecialFunc(keyboard);
 
 	glLightfv(GL_LIGHT0, GL_SPECULAR, light_specular);
 	glLightfv(GL_LIGHT0, GL_POSITION, light_position);
@@ -785,6 +910,6 @@ int main(int argc, char **argv) {
 	glMaterialfv(GL_FRONT, GL_SHININESS, high_shininess);
 	glColorMaterial(GL_FRONT, GL_DIFFUSE);
 
-	glutMainLoop();
-	return 0;
+glutMainLoop();
+return 0;
 }
